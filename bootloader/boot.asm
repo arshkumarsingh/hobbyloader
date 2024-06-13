@@ -2,7 +2,7 @@ BITS 16
 org 0x7c00
 
 start:
-    ; Set up the stack
+    ; Disable interrupts and set up segment registers
     cli
     xor ax, ax
     mov ds, ax
@@ -11,28 +11,18 @@ start:
     mov sp, 0x7C00
 
     ; Print "Loading..."
+    mov si, loading_msg
+print_loop:
+    lodsb
+    cmp al, 0
+    je load_kernel
     mov ah, 0x0E
-    mov al, 'L'
     int 0x10
-    mov al, 'o'
-    int 0x10
-    mov al, 'a'
-    int 0x10
-    mov al, 'd'
-    int 0x10
-    mov al, 'i'
-    int 0x10
-    mov al, 'n'
-    int 0x10
-    mov al, 'g'
-    int 0x10
-    mov al, '.'
-    int 0x10
-    mov al, '.'
-    int 0x10
-    mov al, '.'
-    int 0x10
+    jmp print_loop
 
+loading_msg db 'Loading...', 0
+
+load_kernel:
     ; Load the kernel (first 3 sectors, 1536 bytes)
     mov bx, 0x1000
     mov ah, 0x02
@@ -42,6 +32,7 @@ start:
     mov dh, 0
     mov dl, 0
     int 0x13
+    jc disk_error
 
     ; Switch to protected mode
     cli
@@ -50,6 +41,10 @@ start:
     or eax, 1
     mov cr0, eax
     jmp CODE_SEG:init_pm
+
+disk_error:
+    ; Handle disk error (simple halt)
+    hlt
 
 BITS 32
 init_pm:
@@ -67,7 +62,9 @@ init_pm:
 
     hlt
 
+; Global Descriptor Table (GDT)
 gdt_start:
+    ; Null descriptor
     dw 0x0000
     dw 0x0000
     db 0x00
